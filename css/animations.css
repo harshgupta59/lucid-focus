@@ -1,0 +1,312 @@
+/* ═══════════════════════════════════════════
+   Lucid — Keyframe Animations
+   ═══════════════════════════════════════════ */
+
+/* ─── Breathing Circle ─── */
+@keyframes breathe-in {
+  from { transform: scale(0.6); opacity: 0.5; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes breathe-hold {
+  from { transform: scale(1); }
+  to   { transform: scale(1); }
+}
+
+@keyframes breathe-out {
+  from { transform: scale(1);   opacity: 1; }
+  to   { transform: scale(0.6); opacity: 0.5; }
+}
+
+.breathing-inhale .breathing-circle {
+  animation: breathe-in 4s var(--ease-in-out) forwards;
+}
+
+.breathing-hold .breathing-circle {
+  animation: breathe-hold 7s linear forwards;
+  transform: scale(1);
+  opacity: 1;
+}
+
+.breathing-exhale .breathing-circle {
+  animation: breathe-out 8s var(--ease-in-out) forwards;
+}
+
+/* Breathing ring glow pulse */
+@keyframes ring-pulse {
+  0%, 100% { box-shadow: 0 0 30px var(--accent-glow), inset 0 0 30px rgba(124, 106, 255, 0.1); }
+  50%      { box-shadow: 0 0 60px var(--accent-glow), inset 0 0 50px rgba(124, 106, 255, 0.15); }
+}
+
+.breathing-ring {
+  animation: ring-pulse 4s ease-in-out infinite;
+}
+
+/* ─── Pulse / Glow ─── */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+@keyframes pulse-scale {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 8px var(--accent-glow)); }
+  50%      { filter: drop-shadow(0 0 25px var(--accent-glow)); }
+}
+
+/* ─── Fade Transitions ─── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ─── Slide ─── */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes slide-down {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100%); }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes slide-out-right {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+
+/* ─── Float ─── */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+/* ─── Depth Gauge ─── */
+@keyframes gauge-appear {
+  from {
+    stroke-dashoffset: 879.65;
+    opacity: 0.3;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes timer-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px var(--accent-glow));
+  }
+  50% {
+    filter: drop-shadow(0 0 25px var(--accent-glow));
+  }
+}
+
+/* ─── Ripple ─── */
+@keyframes ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+/* ─── Shimmer ─── */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ─── Star Rating ─── */
+@keyframes star-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* ─── Overlay Entrance ─── */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0);
+    -webkit-backdrop-filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+}
+
+/* ─── Achievement Unlock ─── */
+@keyframes achievement-unlock {
+  0% {
+    transform: scale(0.5) rotate(-10deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.1) rotate(2deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+
+/* ─── Spinner ─── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Heatmap Cell Appear ─── */
+@keyframes cell-appear {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ─── Staggered Entrance ─── */
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── Number Count Up ─── */
+@keyframes count-glow {
+  0% {
+    text-shadow: 0 0 8px var(--accent-glow);
+  }
+  100% {
+    text-shadow: none;
+  }
+}
+
+/* ─── Gauge Rotate ─── */
+@keyframes gauge-rotate-subtle {
+  0%, 100% {
+    transform: rotate(-90deg);
+  }
+  50% {
+    transform: rotate(-89deg);
+  }
+}
+
+/* ─── Completion Burst ─── */
+@keyframes completion-burst {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* ─── Utility Animation Classes ─── */
+.animate-fade-in {
+  animation: fade-in var(--dur-normal) var(--ease-out) forwards;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up var(--dur-slow) var(--ease-out) forwards;
+}
+
+.animate-fade-in-scale {
+  animation: fade-in-scale var(--dur-slow) var(--ease-out) forwards;
+}
+
+.animate-pulse {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float-slow 5s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+.animate-stagger-in {
+  animation: stagger-in 0.5s var(--ease-out) both;
+}
