@@ -33,6 +33,7 @@
   const timer = new FocusTimer();
   const stats = new StatsManager();
   const settingsManager = new SettingsManager();
+  const taskManager = new TaskManager();
 
   /* ─── DOM References ─── */
   const $ = id => document.getElementById(id);
@@ -62,7 +63,15 @@
     btnPause: $('btn-pause'),
     btnResume: $('btn-resume'),
     btnStop: $('btn-stop'),
-    intentionInput: $('intention-input'),
+    // Tasks
+    tasksContainer: $('tasks-container'),
+    taskList: $('task-list'),
+    btnAddTask: $('btn-add-task'),
+    taskFormInline: $('task-form-inline'),
+    taskTitleInput: $('task-title-input'),
+    taskEstInput: $('task-est-input'),
+    btnTaskSave: $('btn-task-save'),
+    btnTaskCancel: $('btn-task-cancel'),
     // Sound
     soundToggle: $('sound-toggle'),
     soundMixer: $('sound-mixer'),
@@ -126,6 +135,10 @@
     // Apply settings
     applySettingsToApp();
     populateSettingsUI();
+
+    // Render tasks
+    renderTasks();
+    taskManager.onChange(renderTasks);
   }
 
   function applySettingsToApp() {
@@ -257,6 +270,9 @@
       if (e.target === els.settingsModal) els.settingsModal.classList.add('hidden');
     });
 
+    // Task Events
+    bindTaskEvents();
+
     // Timer callbacks
     timer.onTick = (remaining, elapsed, progress) => {
       onTimerTick(remaining, elapsed, progress);
@@ -343,10 +359,90 @@
     els.gaugeProgress.setAttribute('stroke-dasharray', `${dashArray} ${GAUGE_CIRCUMFERENCE}`);
   }
 
+  /* ─── Task Rendering & Events ─── */
+
+  function renderTasks() {
+    const tasks = taskManager.getAllTasks();
+    els.taskList.innerHTML = '';
+    
+    if (tasks.length === 0) {
+      els.taskList.innerHTML = '<li style="text-align:center;color:var(--text-muted);font-size:var(--fs-sm);padding:var(--s-2)">No tasks yet.</li>';
+      return;
+    }
+
+    tasks.forEach(task => {
+      const li = document.createElement('li');
+      li.className = `task-item ${task.completed ? 'completed' : ''} ${task.id === taskManager.activeTaskId ? 'active' : ''}`;
+      li.dataset.id = task.id;
+
+      li.innerHTML = `
+        <div class="task-checkbox"></div>
+        <div class="task-title">${task.title}</div>
+        <div class="task-pomodoros">${task.completedPomodoros} / ${task.estimatedPomodoros}</div>
+        <div class="task-actions">
+          <button class="btn-delete-task" aria-label="Delete Task">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+          </button>
+        </div>
+      `;
+
+      // Set active task
+      li.addEventListener('click', (e) => {
+        if (!e.target.closest('.task-checkbox') && !e.target.closest('.btn-delete-task')) {
+          taskManager.setActiveTask(task.id);
+        }
+      });
+
+      // Toggle complete
+      const checkbox = li.querySelector('.task-checkbox');
+      checkbox.addEventListener('click', (e) => {
+        e.stopPropagation();
+        taskManager.toggleComplete(task.id);
+      });
+
+      // Delete task
+      const deleteBtn = li.querySelector('.btn-delete-task');
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        taskManager.deleteTask(task.id);
+      });
+
+      els.taskList.appendChild(li);
+    });
+  }
+
+  function bindTaskEvents() {
+    els.btnAddTask.addEventListener('click', () => {
+      els.taskFormInline.classList.remove('hidden');
+      els.taskTitleInput.focus();
+    });
+
+    els.btnTaskCancel.addEventListener('click', () => {
+      els.taskFormInline.classList.add('hidden');
+      els.taskTitleInput.value = '';
+      els.taskEstInput.value = '1';
+    });
+
+    els.btnTaskSave.addEventListener('click', () => {
+      const title = els.taskTitleInput.value;
+      const est = els.taskEstInput.value;
+      if (title.trim()) {
+        taskManager.addTask(title, est);
+        els.taskFormInline.classList.add('hidden');
+        els.taskTitleInput.value = '';
+        els.taskEstInput.value = '1';
+      }
+    });
+
+    els.taskTitleInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') els.btnTaskSave.click();
+      if (e.key === 'Escape') els.btnTaskCancel.click();
+    });
+  }
+
   /* ─── Session Flow ─── */
 
   function startSession() {
-    const intention = els.intentionInput.value.trim() || 'Focus Session';
     const skipRitual = settingsManager.get('skipBreathing');
 
     if (!skipRitual && timer.mode !== 'flow') {
@@ -475,6 +571,8 @@
 
     // Pomodoro: check auto-start break
     if (timer.mode === 'pomodoro') {
+      taskManager.incrementPomodoroCount();
+      
       if (settingsManager.get('autoStartBreaks')) {
         showToast('Starting break...');
         showBreak();
