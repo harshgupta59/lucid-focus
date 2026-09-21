@@ -498,8 +498,7 @@
     els.btnStop.classList.remove('hidden');
     els.modeSelector.style.opacity = '0.3';
     els.modeSelector.style.pointerEvents = 'none';
-    els.intentionInput.readOnly = true;
-    els.intentionInput.style.opacity = '0.5';
+
 
     // Add pulse animation to timer
     els.timerContainer.classList.add('animate-glow');
@@ -512,8 +511,7 @@
     els.btnStop.classList.add('hidden');
     els.modeSelector.style.opacity = '1';
     els.modeSelector.style.pointerEvents = 'auto';
-    els.intentionInput.readOnly = false;
-    els.intentionInput.style.opacity = '1';
+
 
     els.timerContainer.classList.remove('animate-glow');
   }
@@ -678,7 +676,7 @@
       mode: timer.mode,
       depthReached: lastDepthName,
       rating: focusRating,
-      intention: els.intentionInput.value.trim(),
+      intention: taskManager.getActiveTask() ? taskManager.getActiveTask().title : 'Focus Session',
       note: els.reflectionNote.value.trim(),
     });
 
@@ -688,7 +686,7 @@
     updateStreak();
 
     // Clear intention for next session
-    els.intentionInput.value = '';
+
     lastDepthName = 'Surface';
     
     showToast('Session saved to Insights!', '📝');
