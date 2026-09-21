@@ -10,17 +10,34 @@ class SoundEngine {
     this.masterGain = null;
     this.sounds = {};
     this.initialized = false;
+    this._masterVolume = 0.6; // Store master volume for pause/resume
   }
 
   async init() {
     if (this.initialized) return;
     try {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-      if (this.ctx.state === 'suspended') {
+
+      // Ensure the context is fully running before proceeding.
+      // This handles both initial suspended state and mobile "interrupted" state.
+      if (this.ctx.state !== 'running') {
         await this.ctx.resume();
+        // Double-check — some browsers need a short delay after resume
+        if (this.ctx.state !== 'running') {
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('AudioContext failed to start')), 3000);
+            this.ctx.addEventListener('statechange', () => {
+              if (this.ctx.state === 'running') {
+                clearTimeout(timeout);
+                resolve();
+              }
+            }, { once: true });
+          });
+        }
       }
+
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = 0.6;
+      this.masterGain.gain.value = this._masterVolume;
       this.masterGain.connect(this.ctx.destination);
 
       this._createRain();
@@ -30,6 +47,14 @@ class SoundEngine {
       this._createWind();
       this._createTones();
       this._createNotification();
+
+      // Listen for AudioContext state changes (mobile tab switching, interruptions)
+      this.ctx.addEventListener('statechange', () => {
+        if (this.ctx.state === 'interrupted' || this.ctx.state === 'suspended') {
+          // Attempt auto-recovery
+          this.ctx.resume().catch(() => {});
+        }
+      });
 
       this.initialized = true;
     } catch (e) {
@@ -83,6 +108,7 @@ class SoundEngine {
   }
 
   /* ─── Sound Creators ─── */
+  /* Volumes are tuned so each channel is perceptually similar at default 50% slider */
 
   _createRain() {
     const src = this._makeSource(this._createNoiseBuffer('white', 3));
@@ -117,7 +143,7 @@ class SoundEngine {
     gain.connect(this.masterGain);
     src.start();
 
-    this.sounds.rain = { gain, active: false, volume: 0.5 };
+    this.sounds.rain = { gain, active: false, volume: 0.45 };
   }
 
   _createOcean() {
@@ -156,7 +182,7 @@ class SoundEngine {
     gain.connect(this.masterGain);
     src.start();
 
-    this.sounds.ocean = { gain, active: false, volume: 0.5 };
+    this.sounds.ocean = { gain, active: false, volume: 0.50 };
   }
 
   _createFire() {
@@ -191,7 +217,7 @@ class SoundEngine {
     base.start();
     crackle.start();
 
-    this.sounds.fire = { gain, active: false, volume: 0.5 };
+    this.sounds.fire = { gain, active: false, volume: 0.55 };
   }
 
   _createCrackleBuffer() {
@@ -237,7 +263,7 @@ class SoundEngine {
     gain.connect(this.masterGain);
     src.start();
 
-    this.sounds.cafe = { gain, active: false, volume: 0.5 };
+    this.sounds.cafe = { gain, active: false, volume: 0.35 };
   }
 
   _createWind() {
@@ -273,7 +299,7 @@ class SoundEngine {
     gain.connect(this.masterGain);
     src.start();
 
-    this.sounds.wind = { gain, active: false, volume: 0.5 };
+    this.sounds.wind = { gain, active: false, volume: 0.40 };
   }
 
   _createTones() {
@@ -288,7 +314,7 @@ class SoundEngine {
     ];
 
     const mergeGain = this.ctx.createGain();
-    mergeGain.gain.value = 0.12; // Individual oscillator volume
+    mergeGain.gain.value = 0.08; // Reduced from 0.12 — 6 oscillators stack up
 
     // Heavy low-pass for warmth
     const lp = this.ctx.createBiquadFilter();
@@ -321,7 +347,7 @@ class SoundEngine {
     lp.connect(gain);
     gain.connect(this.masterGain);
 
-    this.sounds.tones = { gain, active: false, volume: 0.5 };
+    this.sounds.tones = { gain, active: false, volume: 0.30 };
   }
 
   _createNotification() {
@@ -331,8 +357,9 @@ class SoundEngine {
   playNotification(type = 'bell') {
     if (!this.initialized || !this.ctx) return;
     
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+    // Ensure context is running before playing notification
+    if (this.ctx.state !== 'running') {
+      this.ctx.resume().catch(() => {});
     }
     
     const osc = this.ctx.createOscillator();
@@ -368,13 +395,20 @@ class SoundEngine {
     const sound = this.sounds[name];
     if (!sound) return false;
 
+    // Ensure context is running (handles mobile tab-switch recovery)
+    if (this.ctx.state !== 'running') {
+      this.ctx.resume().catch(() => {});
+    }
+
     const now = this.ctx.currentTime;
     if (sound.active) {
+      // Fade out
       sound.gain.gain.cancelScheduledValues(now);
       sound.gain.gain.setValueAtTime(sound.gain.gain.value, now);
       sound.gain.gain.linearRampToValueAtTime(0, now + 0.5);
       sound.active = false;
     } else {
+      // Fade in
       sound.gain.gain.cancelScheduledValues(now);
       sound.gain.gain.setValueAtTime(0, now);
       sound.gain.gain.linearRampToValueAtTime(sound.volume, now + 0.8);
@@ -407,6 +441,7 @@ class SoundEngine {
       if (sound.active) {
         sound.gain.gain.cancelScheduledValues(now);
         sound.gain.gain.setValueAtTime(sound.gain.gain.value, now);
+        // Soft fade-out over 1 second instead of abrupt stop
         sound.gain.gain.linearRampToValueAtTime(0, now + 1);
         sound.active = false;
       }
@@ -419,16 +454,42 @@ class SoundEngine {
       .map(([name]) => name);
   }
 
-  suspend() {
-    if (this.ctx && this.ctx.state === 'running') {
-      this.ctx.suspend();
+  /**
+   * Fade the master gain to 0 (mute). Keeps AudioContext running
+   * so all BufferSource nodes and LFOs stay in sync.
+   * Used when pausing a session.
+   */
+  fadeOut() {
+    if (!this.ctx || !this.masterGain) return;
+    const now = this.ctx.currentTime;
+    this.masterGain.gain.cancelScheduledValues(now);
+    this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
+    this.masterGain.gain.linearRampToValueAtTime(0, now + 0.5);
+  }
+
+  /**
+   * Restore the master gain to its stored volume level.
+   * Used when resuming a session.
+   */
+  fadeIn() {
+    if (!this.ctx || !this.masterGain) return;
+    // Ensure context is running (mobile recovery)
+    if (this.ctx.state !== 'running') {
+      this.ctx.resume().catch(() => {});
     }
+    const now = this.ctx.currentTime;
+    this.masterGain.gain.cancelScheduledValues(now);
+    this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
+    this.masterGain.gain.linearRampToValueAtTime(this._masterVolume, now + 0.5);
+  }
+
+  /* Legacy API kept for backwards compatibility, now delegates to fade approach */
+  suspend() {
+    this.fadeOut();
   }
 
   resume() {
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
+    this.fadeIn();
   }
 }
 

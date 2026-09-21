@@ -106,6 +106,15 @@
     bindEvents();
     // Set initial gauge
     setGaugeProgress(0);
+
+    // Request notification permission for timer completion alerts
+    if ('Notification' in window && Notification.permission === 'default') {
+      // Defer the permission request until user interacts
+      document.addEventListener('click', function requestNotif() {
+        Notification.requestPermission();
+        document.removeEventListener('click', requestNotif);
+      }, { once: true });
+    }
   }
 
   /* ─── Event Bindings ─── */
@@ -275,14 +284,14 @@
 
   function pauseSession() {
     timer.pause();
-    sounds.suspend();
+    sounds.fadeOut();
     els.btnPause.classList.add('hidden');
     els.btnResume.classList.remove('hidden');
   }
 
   function resumeSession() {
     timer.resume();
-    sounds.resume();
+    sounds.fadeIn();
     els.btnResume.classList.add('hidden');
     els.btnPause.classList.remove('hidden');
   }
@@ -373,6 +382,9 @@
     stopAllSounds();
     sounds.playNotification('bell');
 
+    // Send browser notification (useful when tab is backgrounded)
+    sendBrowserNotification('Session Complete!', 'Your focus session has ended. Time to reflect.');
+
     // Pomodoro: show break
     if (timer.mode === 'pomodoro') {
       showBreak();
@@ -387,7 +399,7 @@
   /* ─── Break ─── */
 
   function showBreak() {
-    sounds.suspend();
+    sounds.fadeOut();
     
     // Pick a random exercise
     const exercise = EXERCISES[Math.floor(Math.random() * EXERCISES.length)];
@@ -411,7 +423,7 @@
     // Otherwise, show reflection for the full pomodoro set
     if (timer.state === 'running') {
       // Next pomodoro started automatically
-      sounds.resume();
+      sounds.fadeIn();
       showRunningUI();
     } else {
       showIdleUI();
@@ -426,7 +438,7 @@
     timer.skipBreak();
 
     if (timer.state === 'running') {
-      sounds.resume();
+      sounds.fadeIn();
       showRunningUI();
     } else {
       showIdleUI();
@@ -663,6 +675,21 @@
 
   function isYesterday(dateStr) {
     return dateStr === new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  }
+
+  function sendBrowserNotification(title, body) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, {
+          body,
+          icon: 'favicon.svg',
+          badge: 'favicon.svg',
+        });
+      } catch (e) {
+        // Notification constructor can fail on some mobile browsers
+        console.warn('Notification failed:', e);
+      }
+    }
   }
 
   /* ─── Boot ─── */
