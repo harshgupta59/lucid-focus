@@ -9,13 +9,17 @@ class FocusTimer {
     this.mode = 'deep'; // 'deep' | 'pomodoro' | 'flow' | 'custom'
     this.state = 'idle'; // 'idle' | 'running' | 'paused' | 'break'
 
-    // Mode configurations (seconds)
+    // Mode configurations (seconds) - updated via updateConfig()
     this.modes = {
       deep:     { work: 90 * 60, break: 15 * 60, sessions: 1, label: 'Deep Work' },
       pomodoro: { work: 25 * 60, break: 5 * 60,  sessions: 4, label: 'Pomodoro', longBreak: 15 * 60 },
       flow:     { work: Infinity, break: 0, sessions: 1, label: 'Flow' },
       custom:   { work: 45 * 60, break: 9 * 60,  sessions: 1, label: 'Custom' },
     };
+    
+    // Auto-start flags
+    this.autoStartBreaks = false;
+    this.autoStartPomodoros = false;
 
     this.totalSeconds = 0;
     this.remainingSeconds = 0;
@@ -37,6 +41,18 @@ class FocusTimer {
   setMode(mode) {
     if (this.state !== 'idle') return;
     this.mode = mode;
+  }
+
+  updateConfig(settings) {
+    this.modes.deep.work = settings.deepWork * 60;
+    // Deep work break is usually not standard, we'll keep it proportional or just a generic break
+    this.modes.pomodoro.work = settings.pomodoroWork * 60;
+    this.modes.pomodoro.break = settings.pomodoroShortBreak * 60;
+    this.modes.pomodoro.longBreak = settings.pomodoroLongBreak * 60;
+    this.modes.pomodoro.sessions = settings.pomodoroLongBreakInterval;
+    
+    this.autoStartBreaks = settings.autoStartBreaks;
+    this.autoStartPomodoros = settings.autoStartPomodoros;
   }
 
   setCustomTime(minutes) {
@@ -109,8 +125,16 @@ class FocusTimer {
     this._stopInterval();
     this.state = 'idle';
     if (this.mode === 'pomodoro' && this.pomodoroSession < this.modes.pomodoro.sessions) {
-      // Continue to next pomodoro session
-      this._startNextPomodoro();
+      if (this.autoStartPomodoros) {
+        this._startNextPomodoro();
+      } else {
+        // Just prepare for next pomodoro but don't start
+        this.pomodoroSession++;
+        this.totalSeconds = this.modes.pomodoro.work;
+        this.remainingSeconds = this.modes.pomodoro.work;
+        this.elapsedSeconds = 0;
+        this._updateDepth();
+      }
     }
   }
 
@@ -176,7 +200,16 @@ class FocusTimer {
         this.state = 'idle';
 
         if (this.mode === 'pomodoro' && this.pomodoroSession < this.modes.pomodoro.sessions) {
-          this._startNextPomodoro();
+          if (this.autoStartPomodoros) {
+            this._startNextPomodoro();
+          } else {
+            this.pomodoroSession++;
+            this.totalSeconds = this.modes.pomodoro.work;
+            this.remainingSeconds = this.modes.pomodoro.work;
+            this.elapsedSeconds = 0;
+            this._updateDepth();
+            if (this.onBreakEnd) this.onBreakEnd();
+          }
         } else if (this.onBreakEnd) {
           this.onBreakEnd();
         }

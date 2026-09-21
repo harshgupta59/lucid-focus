@@ -53,6 +53,12 @@
         <span class="streak-icon">🔥</span>
         <span class="streak-count" id="streak-count">0</span>
       </div>
+      <button class="settings-btn" id="btn-settings" aria-label="Settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
     </div>
   </header>
 
@@ -375,9 +381,78 @@
     <span id="toast-text">Session saved!</span>
   </div>
 
+  <!-- ═══════════════ SETTINGS MODAL ═══════════════ -->
+  <div class="modal-overlay hidden" id="settings-modal">
+    <div class="modal-content settings-content">
+      <div class="modal-header">
+        <h2>Settings</h2>
+        <button class="modal-close" id="btn-close-settings">✕</button>
+      </div>
+      
+      <div class="settings-sections">
+        <!-- Timer Settings -->
+        <section class="settings-section">
+          <h3><span class="icon">⏱️</span> Timer</h3>
+          <div class="setting-row">
+            <label for="set-pomodoro-work">Pomodoro Work (min)</label>
+            <input type="number" id="set-pomodoro-work" min="1" max="120" value="25">
+          </div>
+          <div class="setting-row">
+            <label for="set-pomodoro-break">Pomodoro Short Break (min)</label>
+            <input type="number" id="set-pomodoro-break" min="1" max="30" value="5">
+          </div>
+          <div class="setting-row">
+            <label for="set-pomodoro-long">Pomodoro Long Break (min)</label>
+            <input type="number" id="set-pomodoro-long" min="1" max="60" value="15">
+          </div>
+          <div class="setting-row">
+            <label for="set-pomodoro-interval">Long Break Interval</label>
+            <input type="number" id="set-pomodoro-interval" min="1" max="10" value="4">
+          </div>
+          <div class="setting-row">
+            <label for="set-deep-work">Deep Work Duration (min)</label>
+            <input type="number" id="set-deep-work" min="15" max="180" value="90">
+          </div>
+        </section>
+
+        <!-- Behavior Settings -->
+        <section class="settings-section">
+          <h3><span class="icon">⚡</span> Behavior</h3>
+          <div class="setting-row toggle-row">
+            <label for="set-auto-break">Auto-start Breaks</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="set-auto-break">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="setting-row toggle-row">
+            <label for="set-auto-pomodoro">Auto-start next Pomodoro</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="set-auto-pomodoro">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="setting-row toggle-row">
+            <label for="set-skip-breathing">Skip Breathing Ritual</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="set-skip-breathing">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </section>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-settings-reset">Reset Defaults</button>
+        <button class="btn btn-primary" id="btn-settings-save">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="js/particles.js"></script>
   <script src="js/sounds.js"></script>
+  <script src="js/settings.js"></script>
   <script src="js/breathing.js"></script>
   <script src="js/timer.js"></script>
   <script src="js/stats.js"></script>

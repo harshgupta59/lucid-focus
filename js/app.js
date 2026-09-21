@@ -32,6 +32,7 @@
   const breathing = new BreathingController();
   const timer = new FocusTimer();
   const stats = new StatsManager();
+  const settingsManager = new SettingsManager();
 
   /* ─── DOM References ─── */
   const $ = id => document.getElementById(id);
@@ -95,6 +96,12 @@
     noSessions: $('no-sessions'),
     // Depth BG
     depthBg: $('depth-bg'),
+    // Settings
+    btnSettings: $('btn-settings'),
+    settingsModal: $('settings-modal'),
+    btnCloseSettings: $('btn-close-settings'),
+    btnSettingsSave: $('btn-settings-save'),
+    btnSettingsReset: $('btn-settings-reset'),
   };
 
   /* ─── Initialization ─── */
@@ -115,6 +122,49 @@
         document.removeEventListener('click', requestNotif);
       }, { once: true });
     }
+
+    // Apply settings
+    applySettingsToApp();
+    populateSettingsUI();
+  }
+
+  function applySettingsToApp() {
+    timer.updateConfig(settingsManager.getAll());
+    if (timer.state === 'idle') {
+      updateTimerDisplay();
+    }
+  }
+
+  function populateSettingsUI() {
+    const s = settingsManager.getAll();
+    $('set-pomodoro-work').value = s.pomodoroWork;
+    $('set-pomodoro-break').value = s.pomodoroShortBreak;
+    $('set-pomodoro-long').value = s.pomodoroLongBreak;
+    $('set-pomodoro-interval').value = s.pomodoroLongBreakInterval;
+    $('set-deep-work').value = s.deepWork;
+    
+    $('set-auto-break').checked = s.autoStartBreaks;
+    $('set-auto-pomodoro').checked = s.autoStartPomodoros;
+    $('set-skip-breathing').checked = s.skipBreathing;
+  }
+
+  function saveSettingsFromUI() {
+    const newSettings = {
+      pomodoroWork: parseInt($('set-pomodoro-work').value) || 25,
+      pomodoroShortBreak: parseInt($('set-pomodoro-break').value) || 5,
+      pomodoroLongBreak: parseInt($('set-pomodoro-long').value) || 15,
+      pomodoroLongBreakInterval: parseInt($('set-pomodoro-interval').value) || 4,
+      deepWork: parseInt($('set-deep-work').value) || 90,
+      
+      autoStartBreaks: $('set-auto-break').checked,
+      autoStartPomodoros: $('set-auto-pomodoro').checked,
+      skipBreathing: $('set-skip-breathing').checked
+    };
+    
+    settingsManager.updateAll(newSettings);
+    applySettingsToApp();
+    els.settingsModal.classList.add('hidden');
+    showToast('Settings saved');
   }
 
   /* ─── Event Bindings ─── */
@@ -191,8 +241,30 @@
     // Save reflection
     els.saveReflection.addEventListener('click', saveReflection);
 
+    // Settings
+    els.btnSettings.addEventListener('click', () => els.settingsModal.classList.remove('hidden'));
+    els.btnCloseSettings.addEventListener('click', () => els.settingsModal.classList.add('hidden'));
+    els.btnSettingsSave.addEventListener('click', saveSettingsFromUI);
+    els.btnSettingsReset.addEventListener('click', () => {
+      settingsManager.reset();
+      populateSettingsUI();
+      applySettingsToApp();
+      showToast('Settings reset to defaults');
+    });
+
+    // Close modals on outside click
+    els.settingsModal.addEventListener('click', (e) => {
+      if (e.target === els.settingsModal) els.settingsModal.classList.add('hidden');
+    });
+
     // Timer callbacks
-    timer.onTick = onTimerTick;
+    timer.onTick = (remaining, elapsed, progress) => {
+      onTimerTick(remaining, elapsed, progress);
+      
+      // Update tab title
+      const timeStr = timer.getDisplayTime();
+      document.title = `${timeStr} — ${timer.getModeLabel()} | Lucid`;
+    };
     timer.onDepthChange = onDepthChange;
     timer.onComplete = onTimerComplete;
     timer.onBreakTick = onBreakTick;
@@ -274,12 +346,24 @@
   /* ─── Session Flow ─── */
 
   function startSession() {
-    // Start breathing ritual first
-    breathing.start(() => {
-      // After breathing, start the timer
+    const intention = els.intentionInput.value.trim() || 'Focus Session';
+    const skipRitual = settingsManager.get('skipBreathing');
+
+    if (!skipRitual && timer.mode !== 'flow') {
+      breathing.start(() => {
+        // After breathing, start the timer
+        timer.start();
+        sounds.playNotification('bell');
+        sounds.fadeIn();
+        showRunningUI();
+      });
+      els.breathingOverlay.classList.remove('hidden');
+    } else {
       timer.start();
+      sounds.playNotification('bell');
+      sounds.fadeIn();
       showRunningUI();
-    });
+    }
   }
 
   function pauseSession() {
@@ -301,6 +385,7 @@
     showIdleUI();
     resetDepthVisuals();
     stopAllSounds();
+    document.title = 'Lucid — Crystal Clear Focus';
 
     // If they spent at least 1 minute, show reflection
     if (elapsed >= 60) {
@@ -381,15 +466,25 @@
     const elapsed = timer.elapsedSeconds || (timer.totalSeconds);
     stopAllSounds();
     sounds.playNotification('bell');
+    document.title = 'Lucid — Crystal Clear Focus';
 
     // Send browser notification (useful when tab is backgrounded)
-    sendBrowserNotification('Session Complete!', 'Your focus session has ended. Time to reflect.');
+    if (settingsManager.get('browserNotifications')) {
+      sendBrowserNotification('Session Complete!', 'Your focus session has ended. Time to reflect.');
+    }
 
-    // Pomodoro: show break
+    // Pomodoro: check auto-start break
     if (timer.mode === 'pomodoro') {
-      showBreak();
+      if (settingsManager.get('autoStartBreaks')) {
+        showToast('Starting break...');
+        showBreak();
+      } else {
+        showBreak(); // It auto starts break immediately in timer.js logic if autoStartBreaks was handled, wait, we handle it in app.js.
+        // Actually, timer.startBreak() is called in showBreak(). So if we just call showBreak(), it works.
+      }
     } else {
       // Other modes: show reflection
+      document.title = 'Lucid — Crystal Clear Focus';
       showIdleUI();
       resetDepthVisuals();
       showReflection(elapsed);
@@ -443,6 +538,7 @@
     } else {
       showIdleUI();
       resetDepthVisuals();
+      document.title = 'Lucid — Crystal Clear Focus';
     }
   }
 
