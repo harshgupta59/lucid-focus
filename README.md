@@ -14,6 +14,17 @@ Lucid is a premium study and deep-work companion designed to help you dive deep 
 - **Flow** — Infinite stopwatch mode for when you're in the zone
 - **Custom** — Set any length from 5 to 180 minutes
 
+### 📝 Task Management
+- Build a customized to-do list for your session
+- Estimate the number of Pomodoros required for each task
+- Tracks completed Pomodoros automatically as the timer finishes
+- State is persisted securely in your browser's local storage
+
+### ⚙️ Personalization & Auto-start
+- **Custom Durations** — Tweak Pomodoro work and break times to your liking
+- **Auto-start Flow** — Automatically transition from work to break and back without clicking
+- **Skip Rituals** — Toggle the breathing exercise on or off based on your preference
+
 ### 🌊 Depth-Based Tracking
 A dynamic circular gauge tracks your "depth" of focus as you progress through a session:
 **Surface → Shallow → Mid → Deep → Abyss**
@@ -80,7 +91,9 @@ lucid-focus/
     ├── sounds.js       # Web Audio API procedural sound engine
     ├── breathing.js    # 4-7-8 breathing ritual controller
     ├── particles.js    # Canvas particle system
-    └── stats.js        # LocalStorage stats, heatmap, achievements
+    ├── stats.js        # LocalStorage stats, heatmap, achievements
+    ├── settings.js     # User preferences and timer duration config
+    └── tasks.js        # Task manager, Pomodoro estimation tracking
 ```
 
 ## 💻 How to Run Locally
@@ -113,7 +126,7 @@ No build step required — just serve the static files.
 ## 🧠 Usage Guide
 
 1. **Select a Mode** — Choose your timer format from the top cards
-2. **Set an Intention** — Type what you're focusing on (e.g., "Write blog post")
+2. **Add Tasks** — Click the '+' button to add actionable tasks and estimate Pomodoros
 3. **Open Ambient Sounds** — Click the music note button to layer soundscapes
 4. **Begin Dive** — Press `Space` or click the button to start the breathing ritual
 5. **Stay Deep** — Watch the depth gauge progress as you maintain focus
