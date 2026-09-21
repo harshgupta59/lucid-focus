@@ -1,0 +1,16 @@
+{
+  "name": "Lucid Focus",
+  "short_name": "Lucid",
+  "description": "Crystal Clear Focus Timer with ambient sounds and deep work tracking.",
+  "start_url": "/?source=pwa",
+  "display": "standalone",
+  "background_color": "#070b14",
+  "theme_color": "#070b14",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

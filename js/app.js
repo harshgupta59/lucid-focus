@@ -111,6 +111,9 @@
     btnCloseSettings: $('btn-close-settings'),
     btnSettingsSave: $('btn-settings-save'),
     btnSettingsReset: $('btn-settings-reset'),
+    // Week 3
+    setFullscreen: $('set-fullscreen'),
+    btnExportData: $('btn-export-data')
   };
 
   /* ─── Initialization ─── */
@@ -139,6 +142,16 @@
     // Render tasks
     renderTasks();
     taskManager.onChange(renderTasks);
+
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(err => {
+        console.warn('Service worker registration failed:', err);
+      });
+    }
+
+    // Hash routing initial load
+    handleHashChange();
   }
 
   function applySettingsToApp() {
@@ -184,8 +197,9 @@
 
   function bindEvents() {
     // Navigation
-    els.navFocus.addEventListener('click', () => switchView('focus'));
-    els.navStats.addEventListener('click', () => switchView('stats'));
+    els.navFocus.addEventListener('click', () => { location.hash = '#focus'; });
+    els.navStats.addEventListener('click', () => { location.hash = '#insights'; });
+    window.addEventListener('hashchange', handleHashChange);
 
     // Mode selection
     els.modeSelector.addEventListener('click', (e) => {
@@ -270,6 +284,45 @@
       if (e.target === els.settingsModal) els.settingsModal.classList.add('hidden');
     });
 
+    // Fullscreen Mode
+    els.setFullscreen.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    });
+
+    // Listen to native fullscreen changes (e.g. user pressed Esc) to update toggle
+    document.addEventListener('fullscreenchange', () => {
+      els.setFullscreen.checked = !!document.fullscreenElement;
+    });
+
+    // Export Data
+    els.btnExportData.addEventListener('click', () => {
+      const data = {
+        stats: JSON.parse(localStorage.getItem('lucid_stats') || '{}'),
+        settings: JSON.parse(localStorage.getItem('lucid_settings') || '{}'),
+        tasks: JSON.parse(localStorage.getItem('lucid_tasks') || '[]')
+      };
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `lucid-focus-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showToast('Data exported successfully!', '💾');
+    });
+
     // Task Events
     bindTaskEvents();
 
@@ -309,6 +362,11 @@
   }
 
   /* ─── View Switching ─── */
+
+  function handleHashChange() {
+    const hash = location.hash.replace('#', '') || 'focus';
+    switchView(hash === 'insights' ? 'stats' : 'focus');
+  }
 
   function switchView(view) {
     currentView = view;

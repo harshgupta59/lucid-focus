@@ -2,8 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Lucid — Crystal Clear Focus</title>
+  
+  <!-- PWA Support -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#070b14">
+  <link rel="apple-touch-icon" href="favicon.svg">
+
   <meta name="description" content="Dive deep into focus with Lucid. A premium study companion with breathing rituals, ambient sounds, and depth-based focus tracking.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -461,6 +467,22 @@
               <input type="checkbox" id="set-skip-breathing">
               <span class="slider"></span>
             </label>
+          </div>
+          <div class="setting-row toggle-row">
+            <label for="set-fullscreen">Fullscreen Mode</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="set-fullscreen">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Data Settings -->
+        <section class="settings-section">
+          <h3><span class="icon">💾</span> Data</h3>
+          <div class="setting-row">
+            <label>Export your stats and settings</label>
+            <button class="btn btn-secondary" id="btn-export-data">Export JSON</button>
           </div>
         </section>
       </div>
