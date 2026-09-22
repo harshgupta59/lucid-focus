@@ -491,6 +491,25 @@ class SoundEngine {
   resume() {
     this.fadeIn();
   }
+
+  /**
+   * Dispose of all audio resources (#23).
+   * Closes the AudioContext so nodes can be garbage collected.
+   */
+  dispose() {
+    if (!this.initialized) return;
+    this.stopAll();
+    // Allow pending ramps to finish before closing
+    setTimeout(() => {
+      if (this.ctx && this.ctx.state !== 'closed') {
+        this.ctx.close().catch(() => {});
+      }
+    }, 1200);
+    this.sounds = {};
+    this.initialized = false;
+    this.ctx = null;
+    this.masterGain = null;
+  }
 }
 
 window.SoundEngine = SoundEngine;

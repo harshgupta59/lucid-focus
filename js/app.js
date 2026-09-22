@@ -25,6 +25,7 @@
   let focusRating = 0;
   let mixerOpen = false;
   let lastDepthName = 'Surface';
+  let toastTimer = null; // Fix #13: track toast timeout
 
   /* ─── Modules ─── */
   const particles = new ParticleSystem('particle-canvas');
@@ -113,7 +114,9 @@
     btnSettingsReset: $('btn-settings-reset'),
     // Week 3
     setFullscreen: $('set-fullscreen'),
-    btnExportData: $('btn-export-data')
+    btnExportData: $('btn-export-data'),
+    btnImportData: $('btn-import-data'),
+    importFileInput: $('import-file-input'),
   };
 
   /* ─── Initialization ─── */
@@ -143,9 +146,9 @@
     renderTasks();
     taskManager.onChange(renderTasks);
 
-    // Register Service Worker for PWA
+    // Register Service Worker for PWA (use relative path, #1)
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(err => {
+      navigator.serviceWorker.register('./sw.js').catch(err => {
         console.warn('Service worker registration failed:', err);
       });
     }
@@ -239,6 +242,7 @@
         const name = channel.dataset.sound;
         const isActive = sounds.toggle(name);
         toggle.classList.toggle('active', isActive);
+        toggle.setAttribute('aria-pressed', isActive); // #19 a11y
         const slider = channel.querySelector('.channel-volume');
         slider.disabled = !isActive;
 
@@ -305,7 +309,7 @@
     // Export Data
     els.btnExportData.addEventListener('click', () => {
       const data = {
-        stats: JSON.parse(localStorage.getItem('lucid_stats') || '{}'),
+        stats: JSON.parse(localStorage.getItem('lucid_sessions') || '[]'),
         settings: JSON.parse(localStorage.getItem('lucid_settings') || '{}'),
         tasks: JSON.parse(localStorage.getItem('lucid_tasks') || '[]')
       };
@@ -314,7 +318,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `lucid-focus-export-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `lucid-focus-export-${new Date().toLocaleDateString('en-CA')}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -322,6 +326,61 @@
       
       showToast('Data exported successfully!', '💾');
     });
+
+    // Import Data (#8)
+    if (els.btnImportData && els.importFileInput) {
+      els.btnImportData.addEventListener('click', () => {
+        els.importFileInput.click();
+      });
+
+      els.importFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const data = JSON.parse(evt.target.result);
+
+            // Import sessions
+            let importedCount = 0;
+            if (data.stats && Array.isArray(data.stats)) {
+              importedCount = stats.importSessions(data.stats);
+            }
+
+            // Import settings
+            if (data.settings && typeof data.settings === 'object') {
+              settingsManager.updateAll(data.settings);
+              applySettingsToApp();
+              populateSettingsUI();
+            }
+
+            // Import tasks
+            if (data.tasks && Array.isArray(data.tasks)) {
+              const existingTasks = taskManager.getAllTasks();
+              const existingIds = new Set(existingTasks.map(t => t.id));
+              let taskCount = 0;
+              for (const t of data.tasks) {
+                if (t.id && !existingIds.has(t.id) && t.title) {
+                  taskManager.addTask(t.title, t.estimatedPomodoros || 1);
+                  taskCount++;
+                }
+              }
+              importedCount += taskCount;
+            }
+
+            updateStreak();
+            showToast(`Imported ${importedCount} items!`, '📥');
+          } catch (err) {
+            showToast('Invalid file format', '⚠️');
+            console.warn('Import failed:', err);
+          }
+        };
+        reader.readAsText(file);
+        // Reset input so the same file can be re-imported
+        e.target.value = '';
+      });
+    }
 
     // Task Events
     bindTaskEvents();
@@ -339,7 +398,7 @@
     timer.onBreakTick = onBreakTick;
     timer.onBreakEnd = onBreakEnd;
 
-    // Keyboard shortcuts
+    // Keyboard shortcuts (with #15 view switching)
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -357,9 +416,34 @@
         case 'KeyS':
           toggleMixer();
           break;
+        // #15: View switching keyboard shortcuts
+        case 'Digit1':
+          location.hash = '#focus';
+          break;
+        case 'Digit2':
+          location.hash = '#insights';
+          break;
+      }
+    });
+
+    // #11: Re-play bell when user returns to tab after session ended in background
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && _sessionCompletedWhileHidden) {
+        _sessionCompletedWhileHidden = false;
+        sounds.init().then(() => sounds.playNotification('bell'));
+        document.title = '⏰ Session Complete! — Lucid';
+        // Flash title for a few seconds then reset
+        setTimeout(() => {
+          if (timer.state === 'idle') {
+            document.title = 'Lucid — Crystal Clear Focus';
+          }
+        }, 5000);
       }
     });
   }
+
+  // #11: Track whether session completed while tab was hidden
+  let _sessionCompletedWhileHidden = false;
 
   /* ─── View Switching ─── */
 
@@ -428,6 +512,9 @@
       return;
     }
 
+    // #18: Use DocumentFragment for batch DOM operations
+    const frag = document.createDocumentFragment();
+
     tasks.forEach(task => {
       const li = document.createElement('li');
       li.className = `task-item ${task.completed ? 'completed' : ''} ${task.id === taskManager.activeTaskId ? 'active' : ''}`;
@@ -436,6 +523,9 @@
       // Build DOM safely (no innerHTML for user content)
       const checkbox = document.createElement('div');
       checkbox.className = 'task-checkbox';
+      checkbox.setAttribute('role', 'checkbox'); // #19 a11y
+      checkbox.setAttribute('aria-checked', task.completed);
+      checkbox.setAttribute('aria-label', `Mark "${task.title}" as ${task.completed ? 'incomplete' : 'complete'}`);
 
       const titleEl = document.createElement('div');
       titleEl.className = 'task-title';
@@ -449,7 +539,7 @@
       actionsEl.className = 'task-actions';
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'btn-delete-task';
-      deleteBtn.setAttribute('aria-label', 'Delete Task');
+      deleteBtn.setAttribute('aria-label', `Delete task: ${task.title}`);
       deleteBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
       actionsEl.appendChild(deleteBtn);
 
@@ -477,8 +567,10 @@
         taskManager.deleteTask(task.id);
       });
 
-      els.taskList.appendChild(li);
+      frag.appendChild(li);
     });
+
+    els.taskList.appendChild(frag);
   }
 
   function bindTaskEvents() {
@@ -547,6 +639,14 @@
   }
 
   function stopSession() {
+    // Fix #12: Confirm before stopping long sessions (> 5 minutes)
+    if (timer.elapsedSeconds > 300) {
+      const mins = Math.floor(timer.elapsedSeconds / 60);
+      if (!confirm(`You've been focused for ${mins} minutes. Are you sure you want to stop?`)) {
+        return;
+      }
+    }
+
     const elapsed = timer.stop();
     showIdleUI();
     resetDepthVisuals();
@@ -627,6 +727,11 @@
     stopAllSounds();
     sounds.playNotification('bell');
     document.title = 'Lucid — Crystal Clear Focus';
+
+    // #11: Track if session completed while tab was hidden
+    if (document.hidden) {
+      _sessionCompletedWhileHidden = true;
+    }
 
     // Send browser notification (useful when tab is backgrounded)
     sendBrowserNotification('Session Complete!', 'Your focus session has ended. Time to reflect.');
@@ -716,10 +821,14 @@
     els.ratingStars.querySelectorAll('.star-btn').forEach(btn => {
       btn.classList.remove('active');
       btn.querySelector('svg').style.fill = 'none';
+      btn.setAttribute('aria-pressed', 'false'); // #19 a11y
     });
     els.reflectionNote.value = '';
 
     els.reflectionOverlay.classList.remove('hidden');
+
+    // #20: Trap focus in the overlay
+    trapFocus(els.reflectionOverlay);
   }
 
   function setRating(rating) {
@@ -730,6 +839,7 @@
       btn.classList.toggle('active', active);
       btn.querySelector('svg').style.fill = active ? 'var(--warning)' : 'none';
       btn.querySelector('svg').style.stroke = active ? 'var(--warning)' : 'currentColor';
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false'); // #19 a11y
     });
   }
 
@@ -747,6 +857,7 @@
     });
 
     els.reflectionOverlay.classList.add('hidden');
+    releaseFocusTrap(); // #20
     updateTimerDisplay();
     setGaugeProgress(0);
     updateStreak();
@@ -758,13 +869,22 @@
     showToast('Session saved to Insights!', '📝');
   }
   
+  // Fix #13: Clear previous toast timeout before showing new one
   function showToast(message, icon = '✨') {
     els.toastText.textContent = message;
     els.toastIcon.textContent = icon;
+
+    // Clear any pending hide
+    if (toastTimer) {
+      clearTimeout(toastTimer);
+      toastTimer = null;
+    }
+
     els.toast.classList.add('show');
     
-    setTimeout(() => {
+    toastTimer = setTimeout(() => {
       els.toast.classList.remove('show');
+      toastTimer = null;
     }, 3000);
   }
 
@@ -796,6 +916,7 @@
     sounds.stopAll();
     document.querySelectorAll('.channel-toggle').forEach(toggle => {
       toggle.classList.remove('active');
+      toggle.setAttribute('aria-pressed', 'false');
       const channel = toggle.closest('.mixer-channel');
       const slider = channel.querySelector('.channel-volume');
       if (slider) slider.disabled = true;
@@ -815,6 +936,57 @@
       els.soundToggle.style.borderColor = '';
       els.soundToggle.style.color = '';
     }
+  }
+
+  /* ─── Focus Trap for Overlays (#20) ─── */
+
+  let _focusTrapEl = null;
+  let _focusTrapHandler = null;
+  let _previousFocus = null;
+
+  function trapFocus(overlayEl) {
+    _previousFocus = document.activeElement;
+    _focusTrapEl = overlayEl;
+
+    const focusableSelector = 'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])';
+    const focusables = overlayEl.querySelectorAll(focusableSelector);
+    if (focusables.length === 0) return;
+
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+
+    // Focus the first interactive element
+    first.focus();
+
+    _focusTrapHandler = (e) => {
+      if (e.key !== 'Tab') return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    overlayEl.addEventListener('keydown', _focusTrapHandler);
+  }
+
+  function releaseFocusTrap() {
+    if (_focusTrapEl && _focusTrapHandler) {
+      _focusTrapEl.removeEventListener('keydown', _focusTrapHandler);
+    }
+    _focusTrapEl = null;
+    _focusTrapHandler = null;
+    // Restore previous focus
+    if (_previousFocus && _previousFocus.focus) {
+      _previousFocus.focus();
+    }
+    _previousFocus = null;
   }
 
   /* ─── Stats Rendering ─── */
@@ -854,31 +1026,49 @@
     const data = stats.getHeatmapData(12);
     els.heatmapGrid.innerHTML = '';
 
+    // #18: Use DocumentFragment
+    const frag = document.createDocumentFragment();
     data.forEach((cell, i) => {
       const div = document.createElement('div');
       div.className = `heatmap-cell level-${cell.level}`;
       div.title = `${cell.date}: ${cell.minutes} min`;
       div.style.animationDelay = `${i * 8}ms`;
-      els.heatmapGrid.appendChild(div);
+      frag.appendChild(div);
     });
+    els.heatmapGrid.appendChild(frag);
   }
 
+  // Fix #6: Use DOM construction instead of innerHTML for achievements
   function renderAchievements() {
     const achievements = stats.getAchievements();
     els.achievementsGrid.innerHTML = '';
 
+    const frag = document.createDocumentFragment();
     achievements.forEach(a => {
       const div = document.createElement('div');
       div.className = `achievement ${a.unlocked ? 'unlocked' : ''}`;
-      div.innerHTML = `
-        <span class="achievement-icon">${a.icon}</span>
-        <span class="achievement-name">${a.name}</span>
-        <span class="achievement-desc">${a.desc}</span>
-      `;
-      els.achievementsGrid.appendChild(div);
+
+      const iconEl = document.createElement('span');
+      iconEl.className = 'achievement-icon';
+      iconEl.textContent = a.icon;
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'achievement-name';
+      nameEl.textContent = a.name;
+
+      const descEl = document.createElement('span');
+      descEl.className = 'achievement-desc';
+      descEl.textContent = a.desc;
+
+      div.appendChild(iconEl);
+      div.appendChild(nameEl);
+      div.appendChild(descEl);
+      frag.appendChild(div);
     });
+    els.achievementsGrid.appendChild(frag);
   }
 
+  // Fix #5: Use DOM construction instead of innerHTML to prevent XSS via intention text
   function renderSessions() {
     const sessions = stats.getRecentSessions(10);
 
@@ -899,40 +1089,73 @@
     // Remove existing items (but keep no-sessions element)
     els.sessionList.querySelectorAll('.session-item').forEach(el => el.remove());
 
+    const frag = document.createDocumentFragment();
+
     sessions.forEach(s => {
       const div = document.createElement('div');
       div.className = 'session-item';
 
-      const depthClass = `depth-${s.depth.toLowerCase()}`;
+      const depthClass = `depth-${(s.depth || 'surface').toLowerCase()}`;
       const stars = s.rating > 0 ? '★'.repeat(s.rating) + '☆'.repeat(5 - s.rating) : '';
       const dateObj = new Date(s.timestamp);
       const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const dateStr = isToday(s.date) ? 'Today' : isYesterday(s.date) ? 'Yesterday' : s.date;
 
-      div.innerHTML = `
-        <div class="session-depth-dot ${depthClass}"></div>
-        <div class="session-info">
-          <div class="session-intention">${s.intention || s.mode}</div>
-          <div class="session-meta">
-            <span>${dateStr} ${timeStr}</span>
-            <span>${stats.formatDurationShort(s.duration)}</span>
-          </div>
-        </div>
-        ${stars ? `<div class="session-rating">${stars}</div>` : ''}
-      `;
+      // Depth dot
+      const dot = document.createElement('div');
+      dot.className = `session-depth-dot ${depthClass}`;
 
-      els.sessionList.appendChild(div);
+      // Info container
+      const info = document.createElement('div');
+      info.className = 'session-info';
+
+      const intentionEl = document.createElement('div');
+      intentionEl.className = 'session-intention';
+      intentionEl.textContent = s.intention || s.mode; // Safe: textContent
+
+      const metaEl = document.createElement('div');
+      metaEl.className = 'session-meta';
+
+      const dateSpan = document.createElement('span');
+      dateSpan.textContent = `${dateStr} ${timeStr}`;
+      const durSpan = document.createElement('span');
+      durSpan.textContent = stats.formatDurationShort(s.duration);
+      metaEl.appendChild(dateSpan);
+      metaEl.appendChild(durSpan);
+
+      info.appendChild(intentionEl);
+      info.appendChild(metaEl);
+
+      div.appendChild(dot);
+      div.appendChild(info);
+
+      // Rating
+      if (stars) {
+        const ratingEl = document.createElement('div');
+        ratingEl.className = 'session-rating';
+        ratingEl.textContent = stars;
+        div.appendChild(ratingEl);
+      }
+
+      frag.appendChild(div);
     });
+
+    els.sessionList.appendChild(frag);
   }
 
   /* ─── Helpers ─── */
 
+  // Fix #10: Use local timezone for date comparisons
+  function _localDateStr(date = new Date()) {
+    return date.toLocaleDateString('en-CA');
+  }
+
   function isToday(dateStr) {
-    return dateStr === new Date().toISOString().split('T')[0];
+    return dateStr === _localDateStr();
   }
 
   function isYesterday(dateStr) {
-    return dateStr === new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    return dateStr === _localDateStr(new Date(Date.now() - 86400000));
   }
 
   function sendBrowserNotification(title, body) {

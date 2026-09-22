@@ -279,42 +279,42 @@
     </div>
     <div class="mixer-channels">
       <div class="mixer-channel" data-sound="rain">
-        <div class="channel-toggle" id="toggle-rain">
+        <div class="channel-toggle" id="toggle-rain" role="button" aria-pressed="false" tabindex="0">
           <span class="channel-icon">🌧️</span>
           <span class="channel-name">Rain</span>
         </div>
         <input type="range" class="channel-volume" id="vol-rain" min="0" max="100" value="50" disabled>
       </div>
       <div class="mixer-channel" data-sound="ocean">
-        <div class="channel-toggle" id="toggle-ocean">
+        <div class="channel-toggle" id="toggle-ocean" role="button" aria-pressed="false" tabindex="0">
           <span class="channel-icon">🌊</span>
           <span class="channel-name">Ocean</span>
         </div>
         <input type="range" class="channel-volume" id="vol-ocean" min="0" max="100" value="50" disabled>
       </div>
       <div class="mixer-channel" data-sound="fire">
-        <div class="channel-toggle" id="toggle-fire">
+        <div class="channel-toggle" id="toggle-fire" role="button" aria-pressed="false" tabindex="0">
           <span class="channel-icon">🔥</span>
           <span class="channel-name">Fire</span>
         </div>
         <input type="range" class="channel-volume" id="vol-fire" min="0" max="100" value="50" disabled>
       </div>
       <div class="mixer-channel" data-sound="cafe">
-        <div class="channel-toggle" id="toggle-cafe">
+        <div class="channel-toggle" id="toggle-cafe" role="button" aria-pressed="false" tabindex="0">
           <span class="channel-icon">☕</span>
           <span class="channel-name">Café</span>
         </div>
         <input type="range" class="channel-volume" id="vol-cafe" min="0" max="100" value="50" disabled>
       </div>
       <div class="mixer-channel" data-sound="wind">
-        <div class="channel-toggle" id="toggle-wind">
+        <div class="channel-toggle" id="toggle-wind" role="button" aria-pressed="false" tabindex="0">
           <span class="channel-icon">💨</span>
           <span class="channel-name">Wind</span>
         </div>
         <input type="range" class="channel-volume" id="vol-wind" min="0" max="100" value="50" disabled>
       </div>
       <div class="mixer-channel" data-sound="tones">
-        <div class="channel-toggle" id="toggle-tones">
+        <div class="channel-toggle" id="toggle-tones" role="button" aria-pressed="false" tabindex="0">
           <span class="channel-icon">🎵</span>
           <span class="channel-name">Tones</span>
         </div>
@@ -484,6 +484,10 @@
             <label>Export your stats and settings</label>
             <button class="btn btn-secondary" id="btn-export-data">Export JSON</button>
           </div>
+          <div class="setting-row">
+            <label>Import data from a previous export</label>
+            <button class="btn btn-secondary" id="btn-import-data">Import JSON</button>
+            <input type="file" id="import-file-input" accept=".json" style="display:none">          </div>
         </section>
       </div>
 

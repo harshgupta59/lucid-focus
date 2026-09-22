@@ -7,7 +7,21 @@
 class StatsManager {
   constructor() {
     this.STORAGE_KEY = 'lucid_sessions';
+    this.MAX_SESSIONS = 5000; // Guard against unbounded growth (#9)
     this.sessions = this._load();
+  }
+
+  /* ─── Date Helpers (local timezone, #10) ─── */
+
+  /** Returns today's date as YYYY-MM-DD in the user's local timezone */
+  _localDateStr(date = new Date()) {
+    // toLocaleDateString('en-CA') returns YYYY-MM-DD in local time
+    return date.toLocaleDateString('en-CA');
+  }
+
+  /** Returns yesterday's date as YYYY-MM-DD in the user's local timezone */
+  _yesterdayStr() {
+    return this._localDateStr(new Date(Date.now() - 86400000));
   }
 
   /* ─── Session CRUD ─── */
@@ -16,7 +30,7 @@ class StatsManager {
     // session: { date, duration, mode, depthReached, rating, intention, note, timestamp }
     const entry = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      date: session.date || new Date().toISOString().split('T')[0],
+      date: session.date || this._localDateStr(),
       timestamp: session.timestamp || Date.now(),
       duration: session.duration || 0,       // seconds
       mode: session.mode || 'deep',
@@ -26,6 +40,12 @@ class StatsManager {
       note: session.note || '',
     };
     this.sessions.push(entry);
+
+    // Guard: prune oldest sessions if over limit (#9)
+    if (this.sessions.length > this.MAX_SESSIONS) {
+      this.sessions = this.sessions.slice(-this.MAX_SESSIONS);
+    }
+
     this._save();
     return entry;
   }
@@ -41,7 +61,7 @@ class StatsManager {
   /* ─── Analytics ─── */
 
   getTotalFocusToday() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = this._localDateStr();
     return this.sessions
       .filter(s => s.date === today)
       .reduce((sum, s) => sum + s.duration, 0);
@@ -52,7 +72,7 @@ class StatsManager {
   }
 
   getSessionCountToday() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = this._localDateStr();
     return this.sessions.filter(s => s.date === today).length;
   }
 
@@ -71,12 +91,10 @@ class StatsManager {
     if (this.sessions.length === 0) return 0;
 
     const days = new Set(this.sessions.map(s => s.date));
-    const sortedDays = [...days].sort().reverse();
+    const today = this._localDateStr();
+    const yesterday = this._yesterdayStr();
 
     // Check if today or yesterday had a session
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-
     if (!days.has(today) && !days.has(yesterday)) return 0;
 
     let streak = 0;
@@ -88,7 +106,7 @@ class StatsManager {
     }
 
     while (true) {
-      const dateStr = checkDate.toISOString().split('T')[0];
+      const dateStr = this._localDateStr(checkDate);
       if (days.has(dateStr)) {
         streak++;
         checkDate = new Date(checkDate.getTime() - 86400000);
@@ -106,10 +124,6 @@ class StatsManager {
     const data = [];
     const today = new Date();
 
-    // Find the most recent Monday to align the grid
-    const dayOfWeek = today.getDay();
-    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-
     // Calculate focus minutes per day
     const dayTotals = {};
     this.sessions.forEach(s => {
@@ -123,7 +137,6 @@ class StatsManager {
     // Align start to Monday
     const start = new Date(today);
     start.setDate(today.getDate() - totalDays + 1);
-    // Align to Monday
     while (start.getDay() !== 1) {
       start.setDate(start.getDate() - 1);
     }
@@ -133,7 +146,7 @@ class StatsManager {
       d.setDate(start.getDate() + i);
       if (d > today) break;
 
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = this._localDateStr(d);
       const totalSecs = dayTotals[dateStr] || 0;
       const totalMins = totalSecs / 60;
 
@@ -275,6 +288,31 @@ class StatsManager {
     } catch (e) {
       console.warn('StatsManager: Failed to save to localStorage', e);
     }
+  }
+
+  /** Returns all session data for export */
+  exportData() {
+    return [...this.sessions];
+  }
+
+  /** Import sessions from exported JSON array */
+  importSessions(importedSessions) {
+    if (!Array.isArray(importedSessions)) return 0;
+    const existingIds = new Set(this.sessions.map(s => s.id));
+    let importCount = 0;
+    for (const s of importedSessions) {
+      if (s.id && !existingIds.has(s.id)) {
+        this.sessions.push(s);
+        existingIds.add(s.id);
+        importCount++;
+      }
+    }
+    // Guard against overflow
+    if (this.sessions.length > this.MAX_SESSIONS) {
+      this.sessions = this.sessions.slice(-this.MAX_SESSIONS);
+    }
+    this._save();
+    return importCount;
   }
 }
 

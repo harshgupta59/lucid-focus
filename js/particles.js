@@ -14,9 +14,16 @@ class ParticleSystem {
     this.running = false;
     this.baseCount = 60;
     this.maxCount = 180;
+    this._resizeTimer = null;
     this._resize();
-    this._boundResize = () => this._resize();
+    this._boundResize = () => this._debouncedResize();
     window.addEventListener('resize', this._boundResize);
+  }
+
+  /* ─── Debounced resize (#17) ─── */
+  _debouncedResize() {
+    if (this._resizeTimer) clearTimeout(this._resizeTimer);
+    this._resizeTimer = setTimeout(() => this._resize(), 150);
   }
 
   _resize() {
@@ -25,7 +32,8 @@ class ParticleSystem {
     this.canvas.height = window.innerHeight * dpr;
     this.canvas.style.width = window.innerWidth + 'px';
     this.canvas.style.height = window.innerHeight + 'px';
-    this.ctx.scale(dpr, dpr);
+    // Fix #3: Use setTransform instead of scale to prevent cumulative scaling
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.width = window.innerWidth;
     this.height = window.innerHeight;
   }
@@ -110,8 +118,11 @@ class ParticleSystem {
 
   _loop() {
     if (!this.running) return;
-    this._update();
-    this._draw();
+    // Fix #16: Skip rendering when tab is hidden to save CPU
+    if (!document.hidden) {
+      this._update();
+      this._draw();
+    }
     this.rafId = requestAnimationFrame(() => this._loop());
   }
 
@@ -132,6 +143,7 @@ class ParticleSystem {
 
   destroy() {
     this.stop();
+    if (this._resizeTimer) clearTimeout(this._resizeTimer);
     window.removeEventListener('resize', this._boundResize);
     this.particles = [];
   }

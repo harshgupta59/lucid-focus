@@ -5,6 +5,22 @@
    ═══════════════════════════════════════════ */
 
 class FocusTimer {
+  /* ─── Depth threshold constants ─── */
+  static DEPTH_THRESHOLDS = {
+    SHALLOW: 0.15,
+    MID:     0.35,
+    DEEP:    0.55,
+    ABYSS:   0.80,
+  };
+
+  static DEPTHS = [
+    { level: 0, name: 'Surface',  color: '#4a8fe7' },
+    { level: 1, name: 'Shallow',  color: '#3366cc' },
+    { level: 2, name: 'Mid',      color: '#1f3d7a' },
+    { level: 3, name: 'Deep',     color: '#7c6aff' },
+    { level: 4, name: 'Abyss',    color: '#00ddb3' },
+  ];
+
   constructor() {
     this.mode = 'deep'; // 'deep' | 'pomodoro' | 'flow' | 'custom'
     this.state = 'idle'; // 'idle' | 'running' | 'paused' | 'break'
@@ -28,7 +44,14 @@ class FocusTimer {
     this.breakTotal = 0;
     this.pomodoroSession = 0;
     this.intervalId = null;
-    this.startTimestamp = null;
+
+    // Drift-corrected timing: track wall-clock timestamps
+    this._wallStart = null;      // Date.now() when timer started
+    this._wallPausedAt = null;   // Date.now() when paused
+    this._wallPausedTotal = 0;   // total ms spent paused
+    this._breakWallStart = null;
+    this._breakWallPausedAt = null;
+    this._breakWallPausedTotal = 0;
 
     // Callbacks
     this.onTick = null;        // (remaining, elapsed, progress) => {}
@@ -80,7 +103,12 @@ class FocusTimer {
     this.elapsedSeconds = 0;
     this.pomodoroSession = 1;
     this.state = 'running';
-    this.startTimestamp = Date.now();
+
+    // Drift-corrected wall-clock tracking
+    this._wallStart = Date.now();
+    this._wallPausedAt = null;
+    this._wallPausedTotal = 0;
+
     this._startInterval();
     this._updateDepth();
   }
@@ -88,12 +116,18 @@ class FocusTimer {
   pause() {
     if (this.state !== 'running') return;
     this.state = 'paused';
+    this._wallPausedAt = Date.now();
     this._stopInterval();
   }
 
   resume() {
     if (this.state !== 'paused') return;
     this.state = 'running';
+    // Accumulate pause duration for drift correction
+    if (this._wallPausedAt) {
+      this._wallPausedTotal += Date.now() - this._wallPausedAt;
+      this._wallPausedAt = null;
+    }
     this._startInterval();
   }
 
@@ -103,6 +137,9 @@ class FocusTimer {
     this._stopInterval();
     this.remainingSeconds = 0;
     this.elapsedSeconds = 0;
+    this._wallStart = null;
+    this._wallPausedAt = null;
+    this._wallPausedTotal = 0;
     return elapsed;
   }
 
@@ -118,6 +155,12 @@ class FocusTimer {
     this.breakTotal = breakDuration;
     this.breakRemaining = breakDuration;
     this.state = 'break';
+
+    // Drift-corrected wall-clock tracking for breaks
+    this._breakWallStart = Date.now();
+    this._breakWallPausedAt = null;
+    this._breakWallPausedTotal = 0;
+
     this._startBreakInterval();
   }
 
@@ -149,11 +192,14 @@ class FocusTimer {
 
   getDepthInfo() {
     const progress = this.getProgress();
-    if (progress < 0.15)      return { level: 0, name: 'Surface',  color: '#4a8fe7' };
-    else if (progress < 0.35) return { level: 1, name: 'Shallow',  color: '#3366cc' };
-    else if (progress < 0.55) return { level: 2, name: 'Mid',      color: '#1f3d7a' };
-    else if (progress < 0.80) return { level: 3, name: 'Deep',     color: '#7c6aff' };
-    else                      return { level: 4, name: 'Abyss',    color: '#00ddb3' };
+    const T = FocusTimer.DEPTH_THRESHOLDS;
+    const D = FocusTimer.DEPTHS;
+
+    if (progress < T.SHALLOW)     return D[0];
+    else if (progress < T.MID)    return D[1];
+    else if (progress < T.DEEP)   return D[2];
+    else if (progress < T.ABYSS)  return D[3];
+    else                          return D[4];
   }
 
   /* ─── Private ─── */
@@ -163,10 +209,12 @@ class FocusTimer {
     this.intervalId = setInterval(() => {
       if (this.state !== 'running') return;
 
-      this.elapsedSeconds++;
+      // Drift-corrected elapsed time from wall clock
+      const wallElapsed = Math.floor((Date.now() - this._wallStart - this._wallPausedTotal) / 1000);
+      this.elapsedSeconds = wallElapsed;
 
       if (this.mode !== 'flow') {
-        this.remainingSeconds = Math.max(0, this.remainingSeconds - 1);
+        this.remainingSeconds = Math.max(0, this.totalSeconds - wallElapsed);
       }
 
       const progress = this.getProgress();
@@ -180,8 +228,9 @@ class FocusTimer {
       // Check completion (not for flow mode)
       if (this.mode !== 'flow' && this.remainingSeconds <= 0) {
         this._stopInterval();
-        this.state = 'idle';
+        // Fire callback before setting idle so handler can inspect state
         if (this.onComplete) this.onComplete();
+        this.state = 'idle';
       }
     }, 1000);
   }
@@ -189,7 +238,9 @@ class FocusTimer {
   _startBreakInterval() {
     this._stopInterval();
     this.intervalId = setInterval(() => {
-      this.breakRemaining--;
+      // Drift-corrected break remaining
+      const breakElapsed = Math.floor((Date.now() - this._breakWallStart - this._breakWallPausedTotal) / 1000);
+      this.breakRemaining = Math.max(0, this.breakTotal - breakElapsed);
 
       if (this.onBreakTick) {
         this.onBreakTick(this.breakRemaining);
@@ -223,6 +274,12 @@ class FocusTimer {
     this.remainingSeconds = this.modes.pomodoro.work;
     this.elapsedSeconds = 0;
     this.state = 'running';
+
+    // Reset wall clock for new pomodoro
+    this._wallStart = Date.now();
+    this._wallPausedAt = null;
+    this._wallPausedTotal = 0;
+
     this._startInterval();
     this._updateDepth();
   }
