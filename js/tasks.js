@@ -7,8 +7,9 @@
 class TaskManager {
   constructor() {
     this.STORAGE_KEY = 'lucid_tasks';
+    this.ACTIVE_KEY = 'lucid_active_task';
     this.tasks = this._load();
-    this.activeTaskId = this.tasks.length > 0 ? this.tasks[0].id : null;
+    this.activeTaskId = this._loadActiveId();
     this.listeners = [];
   }
 
@@ -77,6 +78,7 @@ class TaskManager {
     const task = this.tasks.find(t => t.id === id);
     if (task) {
       this.activeTaskId = id;
+      this._saveActiveId();
       this._save();
       this._notify();
     }
@@ -120,6 +122,22 @@ class TaskManager {
     } catch (e) {
       console.warn('TaskManager: Failed to save to localStorage', e);
     }
+  }
+
+  _loadActiveId() {
+    try {
+      const stored = localStorage.getItem(this.ACTIVE_KEY);
+      if (stored && this.tasks.find(t => t.id === stored)) {
+        return stored;
+      }
+    } catch { /* ignore */ }
+    return this.tasks.length > 0 ? this.tasks[0].id : null;
+  }
+
+  _saveActiveId() {
+    try {
+      localStorage.setItem(this.ACTIVE_KEY, this.activeTaskId || '');
+    } catch { /* ignore */ }
   }
 
   _notify() {

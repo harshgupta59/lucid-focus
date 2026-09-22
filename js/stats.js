@@ -119,10 +119,8 @@ class StatsManager {
 
     // Generate cells for the last N weeks
     const totalDays = weeks * 7;
-    const startDate = new Date(today);
-    startDate.setDate(startDate.getDate() - totalDays + 1 - daysToMonday + (daysToMonday > 0 ? 0 : 0));
 
-    // Adjust to start from Monday
+    // Align start to Monday
     const start = new Date(today);
     start.setDate(today.getDate() - totalDays + 1);
     // Align to Monday

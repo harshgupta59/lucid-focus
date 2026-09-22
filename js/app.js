@@ -433,16 +433,30 @@
       li.className = `task-item ${task.completed ? 'completed' : ''} ${task.id === taskManager.activeTaskId ? 'active' : ''}`;
       li.dataset.id = task.id;
 
-      li.innerHTML = `
-        <div class="task-checkbox"></div>
-        <div class="task-title">${task.title}</div>
-        <div class="task-pomodoros">${task.completedPomodoros} / ${task.estimatedPomodoros}</div>
-        <div class="task-actions">
-          <button class="btn-delete-task" aria-label="Delete Task">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-          </button>
-        </div>
-      `;
+      // Build DOM safely (no innerHTML for user content)
+      const checkbox = document.createElement('div');
+      checkbox.className = 'task-checkbox';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'task-title';
+      titleEl.textContent = task.title; // Safe: textContent escapes HTML
+
+      const pomEl = document.createElement('div');
+      pomEl.className = 'task-pomodoros';
+      pomEl.textContent = `${task.completedPomodoros} / ${task.estimatedPomodoros}`;
+
+      const actionsEl = document.createElement('div');
+      actionsEl.className = 'task-actions';
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn-delete-task';
+      deleteBtn.setAttribute('aria-label', 'Delete Task');
+      deleteBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+      actionsEl.appendChild(deleteBtn);
+
+      li.appendChild(checkbox);
+      li.appendChild(titleEl);
+      li.appendChild(pomEl);
+      li.appendChild(actionsEl);
 
       // Set active task
       li.addEventListener('click', (e) => {
@@ -452,14 +466,12 @@
       });
 
       // Toggle complete
-      const checkbox = li.querySelector('.task-checkbox');
       checkbox.addEventListener('click', (e) => {
         e.stopPropagation();
         taskManager.toggleComplete(task.id);
       });
 
       // Delete task
-      const deleteBtn = li.querySelector('.btn-delete-task');
       deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         taskManager.deleteTask(task.id);
@@ -556,8 +568,6 @@
     els.btnStop.classList.remove('hidden');
     els.modeSelector.style.opacity = '0.3';
     els.modeSelector.style.pointerEvents = 'none';
-
-
     // Add pulse animation to timer
     els.timerContainer.classList.add('animate-glow');
   }
@@ -569,8 +579,6 @@
     els.btnStop.classList.add('hidden');
     els.modeSelector.style.opacity = '1';
     els.modeSelector.style.pointerEvents = 'auto';
-
-
     els.timerContainer.classList.remove('animate-glow');
   }
 
@@ -621,9 +629,7 @@
     document.title = 'Lucid — Crystal Clear Focus';
 
     // Send browser notification (useful when tab is backgrounded)
-    if (settingsManager.get('browserNotifications')) {
-      sendBrowserNotification('Session Complete!', 'Your focus session has ended. Time to reflect.');
-    }
+    sendBrowserNotification('Session Complete!', 'Your focus session has ended. Time to reflect.');
 
     // Pomodoro: check auto-start break
     if (timer.mode === 'pomodoro') {
@@ -633,8 +639,10 @@
         showToast('Starting break...');
         showBreak();
       } else {
-        showBreak(); // It auto starts break immediately in timer.js logic if autoStartBreaks was handled, wait, we handle it in app.js.
-        // Actually, timer.startBreak() is called in showBreak(). So if we just call showBreak(), it works.
+        // Don't auto-start break — show reflection for this pomodoro
+        showIdleUI();
+        resetDepthVisuals();
+        showReflection(elapsed);
       }
     } else {
       // Other modes: show reflection
